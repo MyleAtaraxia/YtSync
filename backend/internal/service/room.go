@@ -10,7 +10,7 @@ import (
 
 var (
 	ErrJoinCodeExhausted = errors.New("could not generate unique join code")
-	joinCodeChars        = []rune("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+	joinCodeChars        = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 )
 
 func CreateRoom(hostID string, publicPlaybackControl bool) (*model.Room, error) {
