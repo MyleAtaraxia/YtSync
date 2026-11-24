@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Build extension
+        working-directory: extension
+        run: bun run build
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          cp extension/dist/ytsync-firefox-v*.zip release/firefox.zip
+          cp extension/dist/ytsync-chrome-v*.zip release/chrome.zip
+          git archive --format=zip --output=release/source.zip HEAD
+          (cd release && for f in source.zip firefox.zip chrome.zip; do sha256sum "$f" > "$f.sha256"; done)
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            release/source.zip \
+            release/source.zip.sha256 \
+            release/firefox.zip \
+            release/firefox.zip.sha256 \
+            release/chrome.zip \
+            release/chrome.zip.sha256 \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes

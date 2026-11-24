@@ -9,8 +9,12 @@ const HTML_FILES = ["popup.html"];
 
 function zipDir(srcDir, outZip) {
   fs.rmSync(outZip, { force: true });
-  // shortcut: shells out to bsdtar for zipping, switch to a JS zip lib if targeting hosts without bsdtar
-  execFileSync("tar", ["-a", "-cf", outZip, "-C", srcDir, ...fs.readdirSync(srcDir)], { stdio: "pipe" });
+  const files = fs.readdirSync(srcDir);
+  if (process.platform === "win32") {
+    execFileSync("tar", ["-a", "-cf", outZip, "-C", srcDir, ...files], { stdio: "pipe" });
+  } else {
+    execFileSync("zip", ["-rq", outZip, ...files], { cwd: srcDir, stdio: "pipe" });
+  }
 }
 
 export async function build() {
