@@ -162,3 +162,21 @@ func CleanupRooms() {
 		}
 	}
 }
+
+func ActiveRoomCount() int {
+	now := time.Now()
+
+	roomMu.RLock()
+	defer roomMu.RUnlock()
+
+	count := 0
+	for _, room := range roomData {
+		room.Mu.RLock()
+		expired := isRoomExpired(room, now)
+		room.Mu.RUnlock()
+		if !expired {
+			count++
+		}
+	}
+	return count
+}

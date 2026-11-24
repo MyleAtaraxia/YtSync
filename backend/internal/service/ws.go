@@ -1,6 +1,7 @@
 package service
 
 import (
+	"backend/internal/metrics"
 	"backend/internal/model"
 	"backend/internal/repository"
 	"encoding/json"
@@ -159,7 +160,7 @@ func sendErrorAndClose(conn *websocket.Conn, code, message string) {
 	)
 }
 
-func HandleRoomWS(w http.ResponseWriter, r *http.Request, joinCode string) {
+func HandleRoomWS(w http.ResponseWriter, r *http.Request, joinCode, clientIP string) {
 	conn, err := wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
@@ -208,8 +209,11 @@ func HandleRoomWS(w http.ResponseWriter, r *http.Request, joinCode string) {
 		send:     make(chan []byte, wsSendBufSize),
 	}
 	registerClient(client)
+	metrics.IncConnections()
+	metrics.RecordActiveUser(clientIP)
 
 	defer func() {
+		metrics.DecConnections()
 		client.closeSend()
 		if unregisterClient(client) {
 			repository.LeaveRoom(joinCode, ticket.ID)

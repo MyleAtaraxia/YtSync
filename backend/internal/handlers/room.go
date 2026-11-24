@@ -76,5 +76,5 @@ func join(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "joinCode is required"})
 		return
 	}
-	service.HandleRoomWS(c.Writer, c.Request, joinCode)
+	service.HandleRoomWS(c.Writer, c.Request, joinCode, c.ClientIP())
 }

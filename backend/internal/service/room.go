@@ -1,6 +1,7 @@
 package service
 
 import (
+	"backend/internal/metrics"
 	"backend/internal/model"
 	"backend/internal/repository"
 	"crypto/rand"
@@ -18,6 +19,7 @@ func CreateRoom(hostID string, publicPlaybackControl bool) (*model.Room, error) 
 		room := model.NewRoom(randJoinCode(model.JoinCodeLength), hostID)
 		room.PublicPlaybackControl = publicPlaybackControl
 		if repository.StoreRoom(room) {
+			metrics.IncRoomsCreated()
 			return room, nil
 		}
 	}

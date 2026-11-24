@@ -5,3 +5,10 @@ services:
       - "${PORT:-8080}:8080"
     environment:
       PORT: "8080"
+      METRICS_API_KEY: "${METRICS_API_KEY:-}"
+      METRICS_API_KEY_FILE: "/data/metrics_api_key"
+    volumes:
+      - server_data:/data
+
+volumes:
+  server_data:

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"backend/internal/metrics"
 	"backend/internal/service"
 	"errors"
 	"net/http"
@@ -33,6 +34,8 @@ func claimTicket(c *gin.Context) {
 		return
 	}
 	ticket, key := service.IssueTicket(name)
+	metrics.IncTicketsClaimed()
+	metrics.RecordActiveUser(c.ClientIP())
 	c.JSON(http.StatusOK, gin.H{
 		"status":       "ok",
 		"id":           ticket.ID,
