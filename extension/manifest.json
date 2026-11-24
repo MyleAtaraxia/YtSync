@@ -15,9 +15,14 @@
     "https://*/*"
   ],
   "action": {
-    "default_title": "YtSync",
-    "default_popup": "popup.html"
+    "default_title": "YtSync"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html"],
+      "matches": ["https://www.youtube.com/*"]
+    }
+  ],
   "background": {
     "service_worker": "background.js",
     "scripts": ["background.js"]

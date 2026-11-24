@@ -4,7 +4,7 @@ import path from "node:path";
 
 const root = import.meta.dirname;
 const dist = path.join(root, "dist");
-const JS_ENTRIES = ["background.js", "content.js", "popup.js"];
+const JS_ENTRIES = ["background.js", "content.js", "popup.js", "overlay.js"];
 const HTML_FILES = ["popup.html"];
 
 function zipDir(srcDir, outZip) {

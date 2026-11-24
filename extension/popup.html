@@ -4,83 +4,382 @@
   <meta charset="utf-8">
   <title>YtSync</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 12px; width: 280px; font-size: 13px; color: #111; }
-    h1 { font-size: 15px; margin: 0 0 10px; }
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    html {
+      margin: 0;
+      height: 100%;
+      background: transparent;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+    body {
+      margin: 0;
+      background: transparent;
+      width: 100%;
+      max-width: 336px;
+      padding: 14px 18px 24px;
+      font-family: "Segoe UI", Tahoma, Geneva, sans-serif;
+      font-size: 12px;
+      color: #102a43;
+    }
+    .aero-window {
+      border-radius: 8px;
+      padding: 6px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.56) 0%, rgba(255, 255, 255, 0.14) 45%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0.14) 100%),
+        radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0) 36%),
+        radial-gradient(circle at 88% 16%, rgba(162, 245, 198, 0.6) 0%, rgba(162, 245, 198, 0) 42%),
+        radial-gradient(circle at 82% 88%, rgba(124, 234, 146, 0.56) 0%, rgba(124, 234, 146, 0) 48%),
+        linear-gradient(160deg, rgba(78, 198, 255, 0.88) 0%, rgba(29, 155, 240, 0.86) 46%, rgba(31, 183, 201, 0.86) 78%, rgba(88, 207, 133, 0.88) 100%);
+      -webkit-backdrop-filter: blur(10px) saturate(140%);
+      backdrop-filter: blur(10px) saturate(140%);
+      border: 1px solid rgba(25, 86, 138, 0.72);
+      box-shadow:
+        0 8px 22px rgba(4, 26, 52, 0.42),
+        0 2px 6px rgba(4, 26, 52, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.88),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+    }
+    .titlebar {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 1px 2px 7px 4px;
+      user-select: none;
+      cursor: grab;
+    }
+    .titlebar:active { cursor: grabbing; }
+    .titlebar-spacer { flex: 1; }
+    .aero-close {
+      width: 34px;
+      height: 19px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      line-height: 1;
+      font-weight: 700;
+      color: #ffffff;
+      border-radius: 3px;
+      border: 1px solid rgba(112, 24, 20, 0.85);
+      background: linear-gradient(180deg, #f3a49b 0%, #e06154 48%, #c72e1f 50%, #df4f41 100%);
+      text-shadow: 0 1px 1px rgba(82, 10, 6, 0.75);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.7),
+        0 1px 2px rgba(0, 0, 0, 0.25);
+      cursor: pointer;
+    }
+    .aero-close:hover {
+      border-color: #7c140e;
+      background: linear-gradient(180deg, #ffbdb5 0%, #f17366 48%, #dc3524 50%, #f26354 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.85),
+        0 0 8px rgba(255, 88, 72, 0.75);
+    }
+    .aero-close:active {
+      background: linear-gradient(180deg, #b8291c 0%, #991f14 50%, #b52a1e 100%);
+      box-shadow: inset 0 1px 2px rgba(60, 8, 4, 0.55);
+    }
+    .aero-orb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      position: relative;
+      background:
+        radial-gradient(circle at 35% 28%, #ffffff 0%, rgba(255, 255, 255, 0.85) 16%, rgba(255, 255, 255, 0) 42%),
+        radial-gradient(circle at 50% 85%, #8ef7a8 0%, rgba(142, 247, 168, 0) 55%),
+        linear-gradient(180deg, #3fd0ff 0%, #0d7be0 55%, #0ea87d 100%);
+      border: 1px solid rgba(14, 72, 128, 0.7);
+      box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.9),
+        0 1px 4px rgba(10, 62, 112, 0.45);
+    }
+    .aero-orb::after {
+      content: "";
+      position: absolute;
+      left: 6px;
+      top: 4px;
+      border-style: solid;
+      border-width: 4px 0 4px 7px;
+      border-color: transparent transparent transparent rgba(255, 255, 255, 0.95);
+      filter: drop-shadow(0 1px 1px rgba(0, 52, 102, 0.6));
+    }
+    h1 {
+      font-size: 13px;
+      font-weight: 600;
+      margin: 0;
+      color: #0b243c;
+      letter-spacing: 0.2px;
+      text-shadow:
+        0 0 8px rgba(255, 255, 255, 0.95),
+        0 0 4px rgba(255, 255, 255, 0.95),
+        0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+    .client-area {
+      background: linear-gradient(180deg, rgba(252, 254, 255, 0.95) 0%, rgba(232, 244, 254, 0.95) 100%);
+      border: 1px solid rgba(58, 114, 164, 0.55);
+      border-radius: 5px;
+      padding: 10px;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        0 1px 0 rgba(255, 255, 255, 0.55);
+    }
     label { display: block; margin-bottom: 8px; }
-    label span { display: block; font-size: 11px; color: #555; margin-bottom: 2px; }
-    input { width: 100%; box-sizing: border-box; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
-    button { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; background: #f5f5f5; cursor: pointer; }
-    button.primary { background: #111; color: #fff; border-color: #111; }
+    label:last-child { margin-bottom: 0; }
+    label span {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #2c5274;
+      margin-bottom: 3px;
+    }
+    input[type="text"], input[type="url"] {
+      width: 100%;
+      padding: 5px 7px;
+      font-family: inherit;
+      font-size: 12px;
+      color: #0e263d;
+      background: linear-gradient(180deg, #f7fbff 0%, #ffffff 30%);
+      border: 1px solid #86a5c2;
+      border-top-color: #6f91b2;
+      border-radius: 3px;
+      box-shadow: inset 0 1px 2px rgba(20, 64, 108, 0.14);
+      outline: none;
+      transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    }
+    input[type="text"]:focus, input[type="url"]:focus {
+      border-color: #2b94e6;
+      box-shadow:
+        0 0 0 2px rgba(56, 173, 255, 0.32),
+        inset 0 1px 2px rgba(20, 64, 108, 0.1);
+    }
+    button {
+      padding: 5px 11px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      color: #153450;
+      border-radius: 4px;
+      border: 1px solid #7593b0;
+      background: linear-gradient(180deg, #f8fcff 0%, #e7f1fa 48%, #d1e3f4 50%, #e2effa 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 1px 2px rgba(16, 62, 108, 0.14);
+      cursor: pointer;
+      transition: filter 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    }
+    button:hover {
+      border-color: #3c86c4;
+      background: linear-gradient(180deg, #f2faff 0%, #d8f0ff 48%, #b3dffc 50%, #d4eeff 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        0 0 6px rgba(68, 182, 255, 0.5);
+    }
+    button:active {
+      background: linear-gradient(180deg, #c6e3f8 0%, #a5d3f4 50%, #bce1fb 100%);
+      box-shadow: inset 0 1px 2px rgba(15, 65, 112, 0.35);
+    }
+    button.primary {
+      color: #ffffff;
+      border-color: #0e69a8;
+      background: linear-gradient(180deg, #7be2ff 0%, #2ab2f2 48%, #0489dc 50%, #1db5ef 100%);
+      text-shadow: 0 1px 1px rgba(0, 48, 92, 0.65);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.8),
+        0 1px 3px rgba(6, 72, 128, 0.3);
+    }
+    button.primary:hover {
+      border-color: #0a5890;
+      background: linear-gradient(180deg, #98ecff 0%, #3dc2ff 48%, #0b98ee 50%, #34c6f8 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        0 0 8px rgba(45, 185, 255, 0.65);
+    }
+    button.primary:active {
+      background: linear-gradient(180deg, #1387cc 0%, #0872b8 50%, #1594dc 100%);
+      box-shadow: inset 0 1px 3px rgba(0, 38, 76, 0.45);
+    }
+    #createBtn {
+      border-color: #217a3c;
+      background: linear-gradient(180deg, #9ef49e 0%, #44c961 48%, #1ea643 50%, #48cf65 100%);
+      text-shadow: 0 1px 1px rgba(10, 68, 26, 0.65);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.82),
+        0 1px 3px rgba(16, 94, 42, 0.28);
+    }
+    #createBtn:hover {
+      border-color: #1a6731;
+      background: linear-gradient(180deg, #b5fab5 0%, #57d672 48%, #25b84d 50%, #5cde78 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 0 8px rgba(72, 224, 112, 0.65);
+    }
+    #createBtn:active {
+      background: linear-gradient(180deg, #259944 0%, #1b8236 50%, #2ba84d 100%);
+      box-shadow: inset 0 1px 3px rgba(8, 52, 20, 0.45);
+    }
+    #leaveBtn {
+      border-color: #b46a6a;
+      color: #6b1a1a;
+      background: linear-gradient(180deg, #fff5f5 0%, #fde1e1 48%, #f6c4c4 50%, #fcdbdb 100%);
+    }
+    #leaveBtn:hover {
+      border-color: #c24b4b;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 0 6px rgba(230, 96, 96, 0.45);
+    }
     .row { display: flex; gap: 6px; align-items: center; }
     .row > input:not([type="checkbox"]) { flex: 1; }
-    .check { display: flex; gap: 6px; align-items: center; font-size: 12px; margin: 6px 0; cursor: pointer; }
-    .check input { width: auto; }
-    .section { border-top: 1px solid #e5e5e5; margin-top: 10px; padding-top: 10px; }
-    .meta { font-size: 12px; color: #444; margin: 4px 0; }
+    .check {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      font-size: 12px;
+      color: #193b5a;
+      margin: 4px 0 8px;
+      cursor: pointer;
+    }
+    .check input { width: auto; accent-color: #1493dc; }
+    .section {
+      margin-top: 9px;
+      padding: 8px 9px;
+      border-radius: 5px;
+      border: 1px solid rgba(132, 180, 219, 0.65);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(224, 242, 255, 0.72) 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        0 1px 2px rgba(24, 84, 138, 0.08);
+    }
+    .meta { font-size: 12px; color: #244766; margin: 4px 0; }
+    .meta strong { color: #0f304f; }
+    .meta > strong { margin-right: 4px; }
     details.meta summary { cursor: pointer; user-select: none; }
-    .members { margin: 4px 0 8px; padding-left: 16px; max-height: 120px; overflow-y: auto; font-size: 12px; color: #333; }
-    .error { color: #b00020; font-size: 12px; margin-top: 8px; }
+    .members {
+      margin: 5px 0 8px;
+      padding: 5px 8px 5px 22px;
+      max-height: 120px;
+      overflow-y: auto;
+      font-size: 12px;
+      color: #183a58;
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid #a8c7e0;
+      border-radius: 3px;
+      box-shadow: inset 0 1px 2px rgba(20, 68, 112, 0.1);
+    }
+    #roomIdText {
+      display: inline-block;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 11px;
+      line-height: 1.2;
+      color: #0b4a7a;
+      background: linear-gradient(180deg, #ffffff 0%, #dff1ff 100%);
+      border: 1px solid #82b5dc;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      cursor: pointer;
+    }
+    #roomIdText:hover {
+      border-color: #2b94e6;
+      box-shadow: 0 0 5px rgba(56, 173, 255, 0.5);
+    }
+    .actions { display: flex; gap: 6px; margin-top: 8px; }
+    .error {
+      margin-top: 8px;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #8b1414;
+      border: 1px solid #d47a7a;
+      background: linear-gradient(180deg, #fff4f4 0%, #ffdada 100%);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    }
     .hidden { display: none; }
-    details.advanced { border-top: 1px solid #e5e5e5; margin-top: 10px; padding-top: 8px; }
-    details.advanced summary { font-size: 11px; color: #666; cursor: pointer; user-select: none; }
+    details.advanced {
+      margin-top: 9px;
+      padding-top: 7px;
+      border-top: 1px solid rgba(132, 180, 219, 0.55);
+    }
+    details.advanced summary {
+      font-size: 11px;
+      font-weight: 600;
+      color: #366287;
+      cursor: pointer;
+      user-select: none;
+    }
     details.advanced label { margin: 6px 0 0; }
   </style>
 </head>
 <body>
-  <h1>YtSync</h1>
-
-  <label>
-    <span>Display name</span>
-    <input id="displayName" type="text" placeholder="Your name">
-  </label>
-
-  <div id="lobbyView">
-    <div class="section">
-      <label class="check">
-        <input id="createPublicControl" type="checkbox">
-        Allow everyone to control playback
-      </label>
-      <button id="createBtn" class="primary">Create room</button>
+  <div class="aero-window">
+    <div class="titlebar">
+      <div class="aero-orb" aria-hidden="true"></div>
+      <h1>YtSync</h1>
+      <div class="titlebar-spacer"></div>
+      <button id="closeBtn" class="aero-close" type="button" title="Close" aria-label="Close">&times;</button>
     </div>
 
-    <div class="section">
+    <div class="client-area">
       <label>
-        <span>Join room code</span>
-        <div class="row">
-          <input id="joinRoomId" type="text" placeholder="Room code">
-          <button id="checkRoomBtn" type="button">Check</button>
-        </div>
+        <span>Display name</span>
+        <input id="displayName" type="text" placeholder="Your name">
       </label>
-      <div id="roomInfo" class="meta hidden"></div>
-      <button id="joinBtn" class="primary">Join room</button>
+
+      <div id="lobbyView">
+        <div class="section">
+          <label class="check">
+            <input id="createPublicControl" type="checkbox">
+            Allow everyone to control playback
+          </label>
+          <button id="createBtn" class="primary">Create room</button>
+        </div>
+
+        <div class="section">
+          <label>
+            <span>Join room code</span>
+            <div class="row">
+              <input id="joinRoomId" type="text" placeholder="Room code">
+              <button id="checkRoomBtn" type="button">Check</button>
+            </div>
+          </label>
+          <div id="roomInfo" class="meta hidden"></div>
+          <button id="joinBtn" class="primary">Join room</button>
+        </div>
+      </div>
+
+      <div id="roomView" class="section hidden">
+        <div class="meta"><strong>Status:</strong> <span id="statusText"></span></div>
+        <div class="meta"><strong>Role:</strong> <span id="roleText"></span></div>
+        <details class="meta">
+          <summary><strong>Users (<span id="memberCount">0</span>)</strong></summary>
+          <ul id="memberList" class="members"></ul>
+        </details>
+        <label class="check">
+          <input id="publicControlToggle" type="checkbox">
+          Public playback control
+        </label>
+        <div class="meta"><strong>Room:</strong> <code id="roomIdText" title="Click to copy"></code></div>
+        <div class="actions">
+          <button id="rebindBtn" type="button">Use this tab</button>
+          <button id="leaveBtn" type="button">Leave</button>
+        </div>
+      </div>
+
+      <div id="error" class="error hidden"></div>
+
+      <details class="advanced">
+        <summary>Server override</summary>
+        <label>
+          <span>Server URL</span>
+          <input id="serverUrl" type="url" placeholder="https://ytsync.ataraxia.ws">
+        </label>
+      </details>
     </div>
   </div>
-
-  <div id="roomView" class="section hidden">
-    <div class="meta"><strong>Status:</strong> <span id="statusText"></span></div>
-    <div class="meta"><strong>Role:</strong> <span id="roleText"></span></div>
-    <details class="meta">
-      <summary><strong>Users (<span id="memberCount">0</span>)</strong></summary>
-      <ul id="memberList" class="members"></ul>
-    </details>
-    <label class="check">
-      <input id="publicControlToggle" type="checkbox">
-      Public playback control
-    </label>
-    <button id="rebindBtn" type="button" style="margin-top: 8px;">Use this tab</button>
-    <div class="meta" style="margin-top: 8px;"><strong>Room:</strong> <code id="roomIdText" style="cursor: pointer;" title="Click to copy"></code></div>
-    <button id="leaveBtn" type="button" style="margin-top: 8px;">Leave</button>
-  </div>
-
-  <div id="error" class="error hidden"></div>
-
-  <details class="advanced">
-    <summary>Server override</summary>
-    <label>
-      <span>Server URL</span>
-      <input id="serverUrl" type="url" placeholder="https://ytsync.ataraxia.ws">
-    </label>
-  </details>
 
   <script src="popup.js"></script>
 </body>

@@ -17,6 +17,8 @@ const api = globalThis.browser ?? globalThis.chrome;
 const sessionStore = api.storage.session ?? api.storage.local;
 const PING_INTERVAL_MS = 20_000;
 const FATAL_ERROR_CODES = new Set(["invalid_ticket", "ticket_expired", "room_not_found"]);
+const YOUTUBE_URL_RE = /^https:\/\/www\.youtube\.com\//i;
+const uiPorts = new Set();
 
 const state = {
   status: "idle",
@@ -124,9 +126,14 @@ function updateBadge() {
 
 function notifyPopup() {
   updateBadge();
-  try {
-    api.runtime.sendMessage({ type: "STATE_UPDATE", state: publicState() })?.catch?.(() => {});
-  } catch {}
+  const payload = { type: "STATE_UPDATE", state: publicState() };
+  for (const port of uiPorts) {
+    try {
+      port.postMessage(payload);
+    } catch {
+      uiPorts.delete(port);
+    }
+  }
 }
 
 function stopTimers() {
@@ -377,10 +384,23 @@ function connectSocket() {
   });
 }
 
-async function getActiveYouTubeTabId() {
-  const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+async function getActiveYouTubeTabId(preferredTabId = null) {
+  let tab = null;
+  if (preferredTabId != null) {
+    if (api.tabs.get) {
+      try {
+        tab = await api.tabs.get(preferredTabId);
+      } catch {
+        throw new Error("Tab is no longer open");
+      }
+    } else {
+      tab = { id: preferredTabId };
+    }
+  } else {
+    [tab] = await api.tabs.query({ active: true, currentWindow: true });
+  }
   if (!tab?.id) throw new Error("No active tab");
-  if (tab.url && !/^https:\/\/www\.youtube\.com\//i.test(tab.url)) {
+  if (tab.url && !YOUTUBE_URL_RE.test(tab.url)) {
     throw new Error("Active tab must be a YouTube page");
   }
   try {
@@ -424,9 +444,35 @@ async function leaveRoom() {
   }
 }
 
-async function handlePopupAction(msg) {
+async function handlePopupAction(msg, sender) {
+  const senderTabId = sender?.tab?.id ?? null;
+
   if (msg.type === "GET_UI_STATE") {
-    return publicState();
+    return { ...publicState(), tabId: senderTabId };
+  }
+
+  if (msg.type === "CHECK_SERVER_PERMISSION") {
+    const parsed = new URL(msg.origin);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error("Invalid server URL");
+    }
+    const isFirefox = api.runtime.getURL("").startsWith("moz-extension:");
+    const pattern = isFirefox ? `${parsed.protocol}//${parsed.hostname}/*` : `${parsed.origin}/*`;
+    const granted = api.permissions?.contains
+      ? await api.permissions.contains({ origins: [pattern] })
+      : true;
+    return { granted: Boolean(granted) };
+  }
+
+  if (msg.type === "OPEN_PERMISSION_TAB") {
+    const parsed = new URL(msg.origin);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error("Invalid server URL");
+    }
+    await api.tabs.create({
+      url: api.runtime.getURL(`popup.html?grant=${encodeURIComponent(parsed.origin)}`),
+    });
+    return {};
   }
 
   if (msg.type === "SAVE_SETTINGS") {
@@ -445,7 +491,7 @@ async function handlePopupAction(msg) {
     const serverUrl = normalizeServerUrl(msg.serverUrl ?? state.serverUrl);
     const displayName = (msg.displayName ?? state.displayName).trim();
     const publicPlaybackControl = Boolean(msg.publicPlaybackControl);
-    const tabId = await getActiveYouTubeTabId();
+    const tabId = await getActiveYouTubeTabId(senderTabId);
     const ticket = await claimTicket(serverUrl, displayName);
     const { roomId } = await createRoom(serverUrl, { ticket, publicPlaybackControl });
 
@@ -479,7 +525,7 @@ async function handlePopupAction(msg) {
     const roomId = (msg.roomId ?? "").trim();
     if (!roomId) throw new Error("Room ID is required");
 
-    const tabId = await getActiveYouTubeTabId();
+    const tabId = await getActiveYouTubeTabId(senderTabId);
     const ticket = await claimTicket(serverUrl, displayName);
 
     await leaveRoom();
@@ -497,7 +543,7 @@ async function handlePopupAction(msg) {
   if (msg.type === "BIND_ACTIVE_TAB") {
     if (!state.roomId) throw new Error("Not in a room");
     const prevTab = state.boundTabId;
-    const tabId = await getActiveYouTubeTabId();
+    const tabId = await getActiveYouTubeTabId(senderTabId);
     if (prevTab != null && prevTab !== tabId) {
       try {
         await api.tabs.sendMessage(prevTab, { type: "SET_ROLE", role: null, roomId: null });
@@ -551,6 +597,30 @@ api.tabs?.onRemoved?.addListener((tabId) => {
     persistSession();
     notifyPopup();
   }
+});
+
+api.runtime.onConnect?.addListener((port) => {
+  if (port.name !== "ytsync-ui") return;
+  uiPorts.add(port);
+  port.onDisconnect.addListener(() => uiPorts.delete(port));
+  ready.then(() => {
+    if (!uiPorts.has(port)) return;
+    try {
+      port.postMessage({ type: "STATE_UPDATE", state: publicState() });
+    } catch {
+      uiPorts.delete(port);
+    }
+  });
+});
+
+api.action?.onClicked?.addListener(async (tab) => {
+  if (!tab?.id || !YOUTUBE_URL_RE.test(tab.url || "")) return;
+  try {
+    await api.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["overlay.js"],
+    });
+  } catch {}
 });
 
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -610,7 +680,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   ready
-    .then(() => handlePopupAction(msg))
+    .then(() => handlePopupAction(msg, sender))
     .then((res) => sendResponse({ ok: true, ...res }))
     .catch((err) => sendResponse({ ok: false, error: err.message }));
   return true;
