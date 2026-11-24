@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>YtSync</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 12px; width: 280px; font-size: 13px; color: #111; }
+    h1 { font-size: 15px; margin: 0 0 10px; }
+    label { display: block; margin-bottom: 8px; }
+    label span { display: block; font-size: 11px; color: #555; margin-bottom: 2px; }
+    input { width: 100%; box-sizing: border-box; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+    button { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; background: #f5f5f5; cursor: pointer; }
+    button.primary { background: #111; color: #fff; border-color: #111; }
+    .row { display: flex; gap: 6px; align-items: center; }
+    .row > input:not([type="checkbox"]) { flex: 1; }
+    .check { display: flex; gap: 6px; align-items: center; font-size: 12px; margin: 6px 0; cursor: pointer; }
+    .check input { width: auto; }
+    .section { border-top: 1px solid #e5e5e5; margin-top: 10px; padding-top: 10px; }
+    .meta { font-size: 12px; color: #444; margin: 4px 0; }
+    .error { color: #b00020; font-size: 12px; margin-top: 8px; }
+    .hidden { display: none; }
+    details.advanced { border-top: 1px solid #e5e5e5; margin-top: 10px; padding-top: 8px; }
+    details.advanced summary { font-size: 11px; color: #666; cursor: pointer; user-select: none; }
+    details.advanced label { margin: 6px 0 0; }
+  </style>
+</head>
+<body>
+  <h1>YtSync</h1>
+
+  <label>
+    <span>Display name</span>
+    <input id="displayName" type="text" placeholder="Your name">
+  </label>
+
+  <div id="lobbyView">
+    <div class="section">
+      <label class="check">
+        <input id="createPublicControl" type="checkbox">
+        Allow everyone to control playback
+      </label>
+      <button id="createBtn" class="primary">Create room</button>
+    </div>
+
+    <div class="section">
+      <label>
+        <span>Join room code</span>
+        <div class="row">
+          <input id="joinRoomId" type="text" placeholder="Room code">
+          <button id="checkRoomBtn" type="button">Check</button>
+        </div>
+      </label>
+      <div id="roomInfo" class="meta hidden"></div>
+      <button id="joinBtn" class="primary">Join room</button>
+    </div>
+  </div>
+
+  <div id="roomView" class="section hidden">
+    <div class="meta"><strong>Status:</strong> <span id="statusText"></span></div>
+    <div class="meta"><strong>Role:</strong> <span id="roleText"></span></div>
+    <div class="meta row">
+      <span><strong>Room:</strong> <code id="roomIdText"></code></span>
+      <button id="copyRoomBtn" type="button">Copy</button>
+    </div>
+    <div class="meta"><strong>Bound tab:</strong> <span id="tabText"></span></div>
+    <label class="check">
+      <input id="publicControlToggle" type="checkbox">
+      Public playback control
+    </label>
+    <div class="row" style="margin-top: 8px;">
+      <button id="rebindBtn" type="button">Use this tab</button>
+      <button id="leaveBtn" type="button">Leave</button>
+    </div>
+  </div>
+
+  <div id="error" class="error hidden"></div>
+
+  <details class="advanced">
+    <summary>Server override</summary>
+    <label>
+      <span>Server URL</span>
+      <input id="serverUrl" type="url" placeholder="https://ytsync.ataraxia.ws">
+    </label>
+  </details>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "ytsync",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build.mjs",
+    "watch": "bun build.mjs --watch",
+    "test": "bun check.mjs"
+  }
+}
