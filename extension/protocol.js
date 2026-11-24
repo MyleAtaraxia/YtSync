@@ -30,6 +30,16 @@ export async function claimTicket(serverUrl, name) {
   return { name: trimmed, key: data["identity-key"] };
 }
 
+export async function getTicketName(serverUrl, id) {
+  const url = `${normalizeServerUrl(serverUrl)}/ticket/${encodeURIComponent(id)}`;
+  const res = await fetch(url);
+  const data = await readJson(res);
+  if (!res.ok || !data.name) {
+    throw new Error(data.error || `Ticket lookup failed (${res.status})`);
+  }
+  return data.name;
+}
+
 export async function getRoomInfo(serverUrl, roomId) {
   const id = roomId.trim();
   if (!id) throw new Error("Room ID is required");

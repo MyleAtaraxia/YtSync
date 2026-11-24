@@ -5,8 +5,10 @@ import (
 	"backend/internal/repository"
 	"encoding/json"
 	"errors"
+	"maps"
 	"math"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 
@@ -120,6 +122,25 @@ func broadcastRoom(roomCode string, payload []byte, exclude *wsClient) {
 	}
 }
 
+func roomMemberIDs(room *model.Room) []string {
+	room.Mu.RLock()
+	ids := slices.Collect(maps.Keys(room.Members))
+	room.Mu.RUnlock()
+	if ids == nil {
+		return []string{}
+	}
+	return ids
+}
+
+func broadcastMembers(room *model.Room, joinCode string, exclude *wsClient) {
+	if payload, err := json.Marshal(map[string]any{
+		"type":    "members",
+		"members": roomMemberIDs(room),
+	}); err == nil {
+		broadcastRoom(joinCode, payload, exclude)
+	}
+}
+
 func writeJSONDirect(conn *websocket.Conn, v any) {
 	_ = conn.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
 	_ = conn.WriteJSON(v)
@@ -192,6 +213,7 @@ func HandleRoomWS(w http.ResponseWriter, r *http.Request, joinCode string) {
 		client.closeSend()
 		if unregisterClient(client) {
 			repository.LeaveRoom(joinCode, ticket.ID)
+			broadcastMembers(room, joinCode, nil)
 		}
 	}()
 
@@ -220,11 +242,14 @@ func HandleRoomWS(w http.ResponseWriter, r *http.Request, joinCode string) {
 		"type":                  "welcome",
 		"role":                  role,
 		"roomId":                joinCode,
+		"hostId":                hostID,
 		"publicPlaybackControl": publicControl,
 		"snapshot":              initialSnap,
+		"members":               roomMemberIDs(room),
 	}); err == nil {
 		client.enqueue(payload)
 	}
+	broadcastMembers(room, joinCode, client)
 
 	for {
 		_ = conn.SetReadDeadline(time.Now().Add(wsReadTimeout))

@@ -17,6 +17,8 @@
     .check input { width: auto; }
     .section { border-top: 1px solid #e5e5e5; margin-top: 10px; padding-top: 10px; }
     .meta { font-size: 12px; color: #444; margin: 4px 0; }
+    details.meta summary { cursor: pointer; user-select: none; }
+    .members { margin: 4px 0 8px; padding-left: 16px; max-height: 120px; overflow-y: auto; font-size: 12px; color: #333; }
     .error { color: #b00020; font-size: 12px; margin-top: 8px; }
     .hidden { display: none; }
     details.advanced { border-top: 1px solid #e5e5e5; margin-top: 10px; padding-top: 8px; }
@@ -57,19 +59,17 @@
   <div id="roomView" class="section hidden">
     <div class="meta"><strong>Status:</strong> <span id="statusText"></span></div>
     <div class="meta"><strong>Role:</strong> <span id="roleText"></span></div>
-    <div class="meta row">
-      <span><strong>Room:</strong> <code id="roomIdText"></code></span>
-      <button id="copyRoomBtn" type="button">Copy</button>
-    </div>
-    <div class="meta"><strong>Bound tab:</strong> <span id="tabText"></span></div>
+    <details class="meta">
+      <summary><strong>Users (<span id="memberCount">0</span>)</strong></summary>
+      <ul id="memberList" class="members"></ul>
+    </details>
     <label class="check">
       <input id="publicControlToggle" type="checkbox">
       Public playback control
     </label>
-    <div class="row" style="margin-top: 8px;">
-      <button id="rebindBtn" type="button">Use this tab</button>
-      <button id="leaveBtn" type="button">Leave</button>
-    </div>
+    <button id="rebindBtn" type="button" style="margin-top: 8px;">Use this tab</button>
+    <div class="meta" style="margin-top: 8px;"><strong>Room:</strong> <code id="roomIdText" style="cursor: pointer;" title="Click to copy"></code></div>
+    <button id="leaveBtn" type="button" style="margin-top: 8px;">Leave</button>
   </div>
 
   <div id="error" class="error hidden"></div>

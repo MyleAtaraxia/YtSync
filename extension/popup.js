@@ -1,5 +1,6 @@
 const api = globalThis.browser ?? globalThis.chrome;
 const $ = (id) => document.getElementById(id);
+let activeTabId = null;
 
 function showError(msg) {
   const el = $("error");
@@ -19,7 +20,16 @@ function render(state) {
     $("statusText").textContent = state.status;
     $("roleText").textContent = state.role || "pending";
     $("roomIdText").textContent = state.roomId;
-    $("tabText").textContent = state.boundTabId != null ? `#${state.boundTabId}` : "none";
+    $("rebindBtn").classList.toggle("hidden", state.boundTabId != null && state.boundTabId === activeTabId);
+    const entries = Object.entries(state.members || {});
+    $("memberCount").textContent = String(entries.length);
+    $("memberList").replaceChildren(
+      ...entries.map(([id, name]) => {
+        const li = document.createElement("li");
+        li.textContent = id === state.hostId ? `${name} (host)` : name;
+        return li;
+      })
+    );
     const toggle = $("publicControlToggle");
     toggle.checked = Boolean(state.publicPlaybackControl);
     toggle.disabled = state.role !== "host";
@@ -99,7 +109,7 @@ $("joinBtn").addEventListener("click", async () => {
   if (res) render(res);
 });
 
-$("copyRoomBtn").addEventListener("click", async () => {
+$("roomIdText").addEventListener("click", async () => {
   const code = $("roomIdText").textContent;
   if (code) await navigator.clipboard.writeText(code);
 });
@@ -130,4 +140,7 @@ api.runtime.onMessage.addListener((msg) => {
   }
 });
 
-send({ type: "GET_UI_STATE" }).then((res) => res && render(res));
+Promise.all([
+  api.tabs.query({ active: true, currentWindow: true }).then(([tab]) => (activeTabId = tab?.id ?? null)),
+  send({ type: "GET_UI_STATE" }),
+]).then(([, res]) => res && render(res));

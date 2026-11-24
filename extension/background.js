@@ -8,6 +8,7 @@ import {
   encodePing,
   encodeSetPublicControl,
   getRoomInfo,
+  getTicketName,
   normalizeServerUrl,
   roomWsUrl,
 } from "./protocol.js";
@@ -27,6 +28,9 @@ const state = {
   serverUrl: DEFAULT_SERVER_URL,
   displayName: "",
   snapshot: null,
+  hostId: null,
+  memberIds: [],
+  members: {},
   clockOffsetMs: 0,
   error: null,
 };
@@ -39,6 +43,28 @@ let manualClose = false;
 let pendingVideoId = null;
 let deferredSnapshot = null;
 let syncNavVideoId = null;
+const memberNames = new Map();
+
+function syncMembers(ids) {
+  state.memberIds = Array.isArray(ids) ? ids : [];
+  const rebuild = () => {
+    state.members = Object.fromEntries(state.memberIds.map((id) => [id, memberNames.get(id) ?? id]));
+    notifyPopup();
+  };
+  const missing = state.memberIds.filter((id) => !memberNames.has(id));
+  rebuild();
+  if (!missing.length) return;
+  const { serverUrl, roomId } = state;
+  Promise.all(
+    missing.map((id) =>
+      getTicketName(serverUrl, id)
+        .then((name) => memberNames.set(id, name))
+        .catch(() => {})
+    )
+  ).then(() => {
+    if (state.roomId === roomId) rebuild();
+  });
+}
 
 function canControl() {
   return state.role === "host" || (state.role === "follower" && state.publicPlaybackControl);
@@ -73,6 +99,8 @@ function publicState() {
     serverUrl: state.serverUrl,
     displayName: state.displayName,
     snapshot: state.snapshot,
+    hostId: state.hostId,
+    members: state.members,
     error: state.error,
   };
 }
@@ -222,6 +250,7 @@ function handleServerMessage(raw) {
   if (msg.type === "welcome") {
     state.status = "connected";
     state.role = msg.role === "host" ? "host" : "follower";
+    state.hostId = msg.hostId ?? null;
     state.publicPlaybackControl = Boolean(msg.publicPlaybackControl);
     state.error = null;
     pendingVideoId = null;
@@ -229,7 +258,7 @@ function handleServerMessage(raw) {
     reconnectAttempt = 0;
     persistSession();
     syncTabRole();
-    notifyPopup();
+    syncMembers(msg.members);
     if (msg.snapshot?.videoId) {
       applySnapshot(msg.snapshot);
     } else if (state.role === "host") {
@@ -266,6 +295,11 @@ function handleServerMessage(raw) {
     return;
   }
 
+  if (msg.type === "members") {
+    syncMembers(msg.members);
+    return;
+  }
+
   if (msg.type === "snapshot") {
     applySnapshot(msg.snapshot ?? msg);
     return;
@@ -288,7 +322,10 @@ function handleServerMessage(raw) {
       closeSocket(true);
       state.roomId = null;
       state.role = null;
+      state.hostId = null;
       state.publicPlaybackControl = false;
+      state.memberIds = [];
+      state.members = {};
       pendingVideoId = null;
       deferredSnapshot = null;
       persistSession();
@@ -370,6 +407,9 @@ async function leaveRoom() {
   state.publicPlaybackControl = false;
   state.boundTabId = null;
   state.snapshot = null;
+  state.hostId = null;
+  state.memberIds = [];
+  state.members = {};
   state.error = null;
   pendingVideoId = null;
   deferredSnapshot = null;
