@@ -58,6 +58,8 @@ export async function build() {
       fs.writeFileSync(path.join(out, file), html.replace(/>\s+</g, "><").trim());
     }
 
+    fs.cpSync(path.join(root, "icons"), path.join(out, "icons"), { recursive: true });
+
     fs.writeFileSync(path.join(out, "manifest.json"), JSON.stringify(manifest));
     zipDir(out, path.join(dist, `ytsync-${target}-v${version}.zip`));
   }
