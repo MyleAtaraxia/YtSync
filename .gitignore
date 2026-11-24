@@ -1,0 +1,27 @@
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+
+# Go backend
+backend/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.txt
+
+# Extension
+extension/node_modules/
+extension/dist/
+*.zip
+*.crx
+*.xpi
