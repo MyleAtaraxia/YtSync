@@ -86,7 +86,7 @@ function scheduleFollowerRecheck() {
   }, delay);
 }
 
-function emitHostCommand(action, positionOverride) {
+function emitHostCommand(action) {
   if (!canControl()) {
     if (action !== "video" && canReceiveSync() && lastSnapshot) {
       if (Date.now() < suppressUntil) {
@@ -99,13 +99,23 @@ function emitHostCommand(action, positionOverride) {
     return;
   }
   if (navigatingToVideoId) return;
+  const videoId = getVideoId();
+  if (!videoId || !boundVideo || isAdPlaying()) return;
+  if (videoId !== lastVideoId) {
+    // The URL can advance while the old player is ending or the new one is loading.
+    if (boundVideo.ended || boundVideo.readyState < 1 || pendingSync?.snapshot?.videoId === videoId) return;
+    lastVideoId = videoId;
+    pendingSync = null;
+    removeSyncPrompt();
+    suppressUntil = 0;
+    ignoreNextSeekedUntil = 0;
+    action = "video";
+  }
   if (action !== "video" && Date.now() < suppressUntil) return;
   if (action === "seek" && Date.now() < ignoreNextSeekedUntil) {
     ignoreNextSeekedUntil = 0;
     return;
   }
-  const videoId = getVideoId();
-  if (!videoId || !boundVideo) return;
   if (pendingSync?.snapshot?.videoId && pendingSync.snapshot.videoId !== videoId) return;
   api.runtime.sendMessage({
     type: "PLAYER_EVENT",
@@ -113,7 +123,7 @@ function emitHostCommand(action, positionOverride) {
       action,
       videoId,
       paused: boundVideo.paused,
-      positionSec: positionOverride ?? boundVideo.currentTime,
+      positionSec: boundVideo.currentTime,
       playbackRate: boundVideo.playbackRate,
     },
   });
@@ -142,9 +152,7 @@ function tryApplyPending() {
     }
     return;
   }
-  if (navigatingToVideoId === currentId) {
-    lastVideoId = currentId;
-  }
+  lastVideoId = currentId;
   navigatingToVideoId = null;
 
   if (!boundVideo || boundVideo.readyState < 1 || isAdPlaying()) return;
@@ -185,17 +193,23 @@ function tryApplyPending() {
   }
 }
 
+function onVideoEvent(event) {
+  if (event.currentTarget !== boundVideo) return;
+  if (event.type === "loadedmetadata" || event.type === "canplay") {
+    checkPage();
+  } else {
+    emitHostCommand(event.type === "seeked" ? "seek" : event.type === "ratechange" ? "rate" : event.type);
+  }
+}
+
 function attachVideo(video) {
   if (boundVideo === video) return;
   boundVideo = video;
   if (!video) return;
 
-  video.addEventListener("play", () => emitHostCommand("play"));
-  video.addEventListener("pause", () => emitHostCommand("pause"));
-  video.addEventListener("seeked", () => emitHostCommand("seek"));
-  video.addEventListener("ratechange", () => emitHostCommand("rate"));
-  video.addEventListener("loadedmetadata", () => tryApplyPending());
-  video.addEventListener("canplay", () => tryApplyPending());
+  for (const type of ["play", "pause", "seeked", "ratechange", "loadedmetadata", "canplay"]) {
+    video.addEventListener(type, onVideoEvent);
+  }
 }
 
 function checkPage() {
@@ -211,11 +225,12 @@ function checkPage() {
     return;
   }
   if (videoId && videoId !== lastVideoId) {
-    lastVideoId = videoId;
-    if (pendingSync?.snapshot?.videoId !== videoId && canControl()) {
+    if (!canControl() || pendingSync?.snapshot?.videoId === videoId) {
+      lastVideoId = videoId;
+    } else {
       pendingSync = null;
       removeSyncPrompt();
-      emitHostCommand("video", 0);
+      emitHostCommand("video");
     }
   }
   tryApplyPending();
@@ -241,9 +256,10 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         ? {
             videoId: getVideoId(),
             url: location.href,
-            currentTime: video.currentTime,
+            positionSec: video.currentTime,
             paused: video.paused,
             playbackRate: video.playbackRate,
+            adPlaying: isAdPlaying(),
           }
         : null
     );

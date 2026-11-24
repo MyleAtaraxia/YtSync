@@ -45,6 +45,7 @@ let manualClose = false;
 let pendingVideoId = null;
 let deferredSnapshot = null;
 let syncNavVideoId = null;
+let bindRequest = 0;
 const memberNames = new Map();
 
 function syncMembers(ids) {
@@ -227,20 +228,30 @@ function recordLocalCommand(command) {
   }
 }
 
+function publishVideoState(info) {
+  const command = {
+    action: "video",
+    videoId: info.videoId,
+    paused: Boolean(info.paused),
+    positionSec: Number(info.positionSec ?? 0),
+    playbackRate: Number(info.playbackRate || 1),
+  };
+  ws.send(encodeCommand(command));
+  recordLocalCommand(command);
+}
+
 async function pushInitialHostState() {
   if (state.role !== "host" || state.boundTabId == null || ws?.readyState !== WebSocket.OPEN) return;
+  const socket = ws;
+  const tabId = state.boundTabId;
+  const snapshot = state.snapshot;
   try {
-    const info = await api.tabs.sendMessage(state.boundTabId, { type: "GET_VIDEO_STATE" });
-    if (info?.videoId && ws?.readyState === WebSocket.OPEN) {
-      const cmd = {
-        action: "video",
-        videoId: info.videoId,
-        paused: Boolean(info.paused),
-        positionSec: Number(info.currentTime ?? 0),
-        playbackRate: Number(info.playbackRate || 1),
-      };
-      recordLocalCommand(cmd);
-      ws.send(encodeCommand(cmd));
+    const info = await api.tabs.sendMessage(tabId, { type: "GET_VIDEO_STATE" });
+    if (
+      info?.videoId && state.snapshot === snapshot &&
+      state.boundTabId === tabId && ws === socket && socket.readyState === WebSocket.OPEN
+    ) {
+      publishVideoState(info);
     }
   } catch {}
 }
@@ -384,7 +395,7 @@ function connectSocket() {
   });
 }
 
-async function getActiveYouTubeTabId(preferredTabId = null) {
+async function getActiveYouTubeTab(preferredTabId = null) {
   let tab = null;
   if (preferredTabId != null) {
     if (api.tabs.get) {
@@ -404,14 +415,14 @@ async function getActiveYouTubeTabId(preferredTabId = null) {
     throw new Error("Active tab must be a YouTube page");
   }
   try {
-    await api.tabs.sendMessage(tab.id, { type: "GET_VIDEO_STATE" });
-    return tab.id;
+    const playback = await api.tabs.sendMessage(tab.id, { type: "GET_VIDEO_STATE" });
+    return { tabId: tab.id, playback };
   } catch {
     if (api.scripting?.executeScript) {
       try {
         await api.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
-        await api.tabs.sendMessage(tab.id, { type: "GET_VIDEO_STATE" });
-        return tab.id;
+        const playback = await api.tabs.sendMessage(tab.id, { type: "GET_VIDEO_STATE" });
+        return { tabId: tab.id, playback };
       } catch {}
     }
     throw new Error("Active tab must be a YouTube page");
@@ -419,6 +430,7 @@ async function getActiveYouTubeTabId(preferredTabId = null) {
 }
 
 async function leaveRoom() {
+  bindRequest += 1;
   const prevTab = state.boundTabId;
   closeSocket(true);
   state.status = "idle";
@@ -491,7 +503,7 @@ async function handlePopupAction(msg, sender) {
     const serverUrl = normalizeServerUrl(msg.serverUrl ?? state.serverUrl);
     const displayName = (msg.displayName ?? state.displayName).trim();
     const publicPlaybackControl = Boolean(msg.publicPlaybackControl);
-    const tabId = await getActiveYouTubeTabId(senderTabId);
+    const { tabId } = await getActiveYouTubeTab(senderTabId);
     const ticket = await claimTicket(serverUrl, displayName);
     const { roomId } = await createRoom(serverUrl, { ticket, publicPlaybackControl });
 
@@ -525,7 +537,7 @@ async function handlePopupAction(msg, sender) {
     const roomId = (msg.roomId ?? "").trim();
     if (!roomId) throw new Error("Room ID is required");
 
-    const tabId = await getActiveYouTubeTabId(senderTabId);
+    const { tabId } = await getActiveYouTubeTab(senderTabId);
     const ticket = await claimTicket(serverUrl, displayName);
 
     await leaveRoom();
@@ -542,23 +554,36 @@ async function handlePopupAction(msg, sender) {
 
   if (msg.type === "BIND_ACTIVE_TAB") {
     if (!state.roomId) throw new Error("Not in a room");
-    const prevTab = state.boundTabId;
-    const tabId = await getActiveYouTubeTabId(senderTabId);
-    if (prevTab != null && prevTab !== tabId) {
-      try {
-        await api.tabs.sendMessage(prevTab, { type: "SET_ROLE", role: null, roomId: null });
-      } catch {}
+    const request = ++bindRequest;
+    const { tabId, playback } = await getActiveYouTubeTab(senderTabId);
+    if (request !== bindRequest || !state.roomId) throw new Error("Tab switch was superseded");
+
+    if (state.role === "host" && !state.publicPlaybackControl) {
+      if (state.status !== "connected" || ws?.readyState !== WebSocket.OPEN) {
+        throw new Error("Reconnect to the room before switching tabs");
+      }
+      if (!playback?.videoId) throw new Error("Open a YouTube video in this tab first");
+      if (playback.adPlaying) throw new Error("Wait for the ad to finish before switching tabs");
+      publishVideoState(playback);
     }
+
+    const prevTab = state.boundTabId;
     state.boundTabId = tabId;
-    await persistSession();
+    syncNavVideoId = null;
+    if (prevTab != null && prevTab !== tabId) {
+      api.tabs.sendMessage(prevTab, { type: "SET_ROLE", role: null, roomId: null }).catch(() => {});
+    }
     syncTabRole();
     if (shouldApplySnapshot() && state.snapshot) {
-      await sendToBoundTab({
+      syncNavVideoId = state.snapshot.videoId || null;
+      sendToBoundTab({
         type: "APPLY_SNAPSHOT",
         snapshot: state.snapshot,
         clockOffsetMs: state.clockOffsetMs,
       });
     }
+    await persistSession();
+    notifyPopup();
     return publicState();
   }
 
@@ -656,15 +681,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           msg.videoId !== syncNavVideoId;
         syncNavVideoId = null;
         if (isLocalFullNav) {
-          const cmd = {
-            action: "video",
-            videoId: msg.videoId,
-            paused: Boolean(msg.paused),
-            positionSec: Number(msg.positionSec ?? 0),
-            playbackRate: Number(msg.playbackRate || 1),
-          };
-          recordLocalCommand(cmd);
-          ws.send(encodeCommand(cmd));
+          publishVideoState(msg);
           return;
         }
         if (shouldApplySnapshot() && state.snapshot) {
